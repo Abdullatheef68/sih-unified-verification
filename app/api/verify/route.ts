@@ -1,10 +1,16 @@
-import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-  const id = searchParams.get("id")
-  if (!id) return NextResponse.json({ error: "Certificate ID required" }, { status: 400 })
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id");
+  if (!id)
+    return NextResponse.json(
+      { error: "Certificate ID required" },
+      { status: 400 },
+    );
 
   // Auto-expire check
   const cert = await prisma.certificate.findUnique({
@@ -13,19 +19,31 @@ export async function GET(req: Request) {
       instrument: true,
       application: {
         include: {
-          verificationResult: { include: { officer: { select: { name: true } } } },
+          verificationResult: {
+            include: { officer: { select: { name: true } } },
+          },
         },
       },
     },
-  })
+  });
 
-  if (!cert) return NextResponse.json({ error: "Certificate not found" }, { status: 404 })
+  if (!cert)
+    return NextResponse.json(
+      { error: "Certificate not found" },
+      { status: 404 },
+    );
 
   // Auto update expired
   if (cert.status === "VALID" && new Date(cert.validUntil) < new Date()) {
-    await prisma.certificate.update({ where: { id: cert.id }, data: { status: "EXPIRED" } })
-    await prisma.instrument.update({ where: { id: cert.instrumentId }, data: { status: "EXPIRED" } })
-    cert.status = "EXPIRED"
+    await prisma.certificate.update({
+      where: { id: cert.id },
+      data: { status: "EXPIRED" },
+    });
+    await prisma.instrument.update({
+      where: { id: cert.instrumentId },
+      data: { status: "EXPIRED" },
+    });
+    cert.status = "EXPIRED";
   }
 
   return NextResponse.json({
@@ -36,5 +54,5 @@ export async function GET(req: Request) {
     instrument: cert.instrument,
     overallResult: cert.application?.verificationResult?.overallResult,
     officer: cert.application?.verificationResult?.officer,
-  })
+  });
 }
