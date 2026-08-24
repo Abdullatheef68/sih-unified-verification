@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  password      String
+  role          String
+  phone         String?
+  state         String?
+  district      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  instruments   Instrument[]
+  applications  Application[] @relation("AssignedOfficer")
+  verificationResults VerificationResult[]
+  auditLogs     AuditLog[]
+
+  @@index([role])
+  @@index([state])
+}
+
+model Instrument {
+  id              String           @id @default(cuid())
+  ownerId         String
+  type            String
+  make            String
+  model           String
+  serialNumber    String
+  capacity        String?
+  accuracyClass   String?
+  location        String
+  state           String
+  district        String
+  status          String           @default("PENDING_VERIFICATION")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  owner           User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  applications    Application[]
+  certificates    Certificate[]
+
+  @@unique([serialNumber, make])
+  @@index([ownerId])
+  @@index([state, district])
+  @@index([status])
+}
+
+model Application {
+  id              String            @id @default(cuid())
+  instrumentId    String
+  type            String
+  status          String          @default("PENDING")
+  appliedAt       DateTime          @default(now())
+  assignedToId    String?
+  scheduledDate   DateTime?
+  notes           String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  instrument      Instrument        @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  assignedTo      User?             @relation("AssignedOfficer", fields: [assignedToId], references: [id])
+  verificationResult VerificationResult?
+  certificate     Certificate?
+
+  @@index([status])
+  @@index([assignedToId])
+  @@index([instrumentId])
+}
+
+model VerificationResult {
+  id              String        @id @default(cuid())
+  applicationId   String        @unique
+  officerId       String
+  observations    String?
+  testResults     String?
+  overallResult   String
+  photos          String  @default("[]")
+  verifiedAt      DateTime      @default(now())
+
+  application     Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  officer         User          @relation(fields: [officerId], references: [id])
+
+  @@index([officerId])
+}
+
+model Certificate {
+  id                String            @id @default(cuid())
+  certificateNumber String            @unique
+  applicationId     String            @unique
+  instrumentId      String
+  issuedAt          DateTime          @default(now())
+  validUntil        DateTime
+  status            String            @default("VALID")
+  qrData            String
+  pdfPath           String?
+
+  application       Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  instrument        Instrument        @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@index([certificateNumber])
+  @@index([status])
+  @@index([validUntil])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String
+  entityType  String?
+  entityId    String?
+  details     String?
+  createdAt   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+}
